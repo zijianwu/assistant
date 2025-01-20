@@ -6,7 +6,8 @@ import random
 
 
 class BrowserPage:
-    """A wrapper around Playwright's Page object that maintains BrowserManager context."""
+    """A wrapper around Playwright's Page object that maintains
+    BrowserManager context."""
 
     def __init__(self, playwright_page: object) -> None:
         """
@@ -18,7 +19,8 @@ class BrowserPage:
         self._page = playwright_page
 
     def __getattr__(self, name: str) -> object:
-        """Delegate any unknown attributes to the underlying Playwright page."""
+        """Delegate any unknown attributes to the underlying
+        Playwright page."""
         return getattr(self._page, name)
 
     def __repr__(self) -> str:
@@ -26,7 +28,8 @@ class BrowserPage:
 
 
 class BrowserManager:
-    """Manages a persistent Playwright browser instance with realistic user profile."""
+    """Manages a persistent Playwright browser instance with
+    realistic user profile."""
 
     def __init__(self,
                  user_data_dir: Optional[str] = None,
@@ -51,10 +54,14 @@ class BrowserManager:
         self.base_longitude = -71.0589
         self.languages = ['en-US', 'en']
         self.developer_extensions = [
-            {"name": "React Developer Tools", "filename": "fmkadmapgofadopljbjfkapdkoienihi"},
-            {"name": "Redux DevTools", "filename": "lmhkpmbekcpmknklioeibfkpmmfibljd"},
-            {"name": "JSON Formatter", "filename": "bcjindcccaagfpapjjmafapmmgkkhgoa"},
-            {"name": "GitHub Dark Theme", "filename": "kom08lmcnfglkjfggdepcdcpbgkmegjj"}
+            {"name": "React Developer Tools",
+             "filename": "fmkadmapgofadopljbjfkapdkoienihi"},
+            {"name": "Redux DevTools",
+             "filename": "lmhkpmbekcpmknklioeibfkpmmfibljd"},
+            {"name": "JSON Formatter",
+             "filename": "bcjindcccaagfpapjjmafapmmgkkhgoa"},
+            {"name": "GitHub Dark Theme",
+             "filename": "kom08lmcnfglkjfggdepcdcpbgkmegjj"}
         ]
 
     def _get_chrome_version(self) -> str:
@@ -64,7 +71,8 @@ class BrowserManager:
         return f"{major_version}.{'.'.join(minor_versions)}"
 
     def _get_platform_specific_configs(self) -> Dict[str, str]:
-        """Get platform-specific browser configurations for our developer persona."""
+        """Get platform-specific browser configurations
+        for our developer persona."""
         chrome_version = self._get_chrome_version()
 
         # Focused on MacOS configuration since our persona uses a MacBook Pro
@@ -89,7 +97,8 @@ class BrowserManager:
         return configs.get(platform.system(), default_config)
 
     def _inject_browser_apis(self, page: object) -> None:
-        """Inject realistic browser APIs and developer-specific configurations."""
+        """Inject realistic browser APIs and
+        developer-specific configurations."""
         platform_configs = self._get_platform_specific_configs()
 
         # Add developer-specific WebGL extensions
@@ -340,7 +349,9 @@ class BrowserManager:
     def _new_page(self) -> BrowserPage:
         """Get a new page with injected browser APIs and developer tools."""
         if not self.browser_context:
-            raise RuntimeError("Browser context not initialized. Call start() first.")
+            raise RuntimeError(
+                "Browser context not initialized. Call start() first."
+            )
 
         page = self.browser_context.new_page()
         self._inject_browser_apis(page)

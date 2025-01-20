@@ -2,11 +2,12 @@ from assistant.browser import BrowserPage
 from typing import List
 
 
-def setup_HEB_search_location(page: BrowserPage, zip_code: int = 78209) -> None:
+def setup_HEB_search_location(page: BrowserPage,
+                              zip_code: int = 78209) -> None:
     """Sets up HEB store location for web scraping session.
 
-    Navigates to HEB website and configures the store location based on provided
-    zip code by selecting the first available store in that area.
+    Navigates to HEB website and configures the store location based
+    on providedzip code by selecting the first available store in that area.
 
     Args:
         page (BrowserPage): Playwright browser page object for web interaction
@@ -55,8 +56,8 @@ def find_product_at_HEB(product_query: str,
         browser_page (BrowserPage): Browser page object for web interaction
 
     Returns:
-        List[str]: List of product titles that are in stock. Empty list if no products
-                  found or in case of errors
+        List[str]: List of product titles that are in stock. Empty list
+        if no products found or in case of errors
 
     Raises:
         Exception: For any errors during web scraping or page navigation
@@ -65,7 +66,8 @@ def find_product_at_HEB(product_query: str,
         >>> browser = BrowserPage()
         >>> products = find_product_at_HEB("milk", browser, 78209)
         >>> print(products)
-        ['H-E-B Select Ingredients Whole Milk', 'H-E-B Select 2% Reduced Fat Milk']
+        ['H-E-B Select Ingredients Whole Milk', 'H-E-B Select
+        2% Reduced Fat Milk']
     """
     try:
         # Navigate to the search URL for the desired product

@@ -1,4 +1,7 @@
 import inspect
+import re
+from types import FunctionType
+from typing import Any, Dict, Type, get_type_hints
 
 
 def function_to_schema(func) -> dict:
@@ -50,124 +53,182 @@ def function_to_schema(func) -> dict:
     }
 
 
-from typing import Any, Dict, List, Optional, Type
-
-
-def class_to_function(cls: Type) -> Dict[str, callable]:
+def class_to_function(cls: Type[Any]) -> Dict[str, FunctionType]:
     """
-    Convert a class's __init__ and public methods into standalone functions.
+    Converts a class's __init__ and public methods into standalone functions.
+
+    - The constructor becomes `initialize_<classname_in_snake_case>`.
+    - Each public method becomes `<methodname>_<classname_in_snake_case>`.
+    - Generated functions preserve the original docstring and type hints.
+    - For methods that require 'self', the generated function prepends
+      a parameter referencing an instance of `cls`.
 
     Args:
-        cls: The class to convert
+        cls: The class to generate standalone functions for.
 
     Returns:
-        Dict[str, callable]: A dictionary mapping function names to their callable implementations
+        A dictionary mapping each generated function name to the function
+        object.
     """
-    functions = {}
 
-    # Get all class attributes including base classes
-    class_dict = {}
-    for c in inspect.getmro(cls):
-        class_dict.update(c.__dict__)
+    def snake_case(name: str) -> str:
+        """Helper to convert CamelCase or PascalCase to snake_case."""
+        s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
+        s2 = re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1)
+        return s2.lower()
 
-    # Get all imports from the class's module
-    module = inspect.getmodule(cls)
-    module_dict = {} if module is None else module.__dict__.copy()
+    def generate_initialize_func(cls: Type[Any]) -> FunctionType:
+        """
+        Generate a function that calls the class's __init__. The function name
+        will be `initialize_<classname_in_snake_case>`.
+        """
+        init_method = cls.__init__
 
-    # Get all public methods (excluding dunder methods)
-    methods = inspect.getmembers(cls, predicate=inspect.isfunction)
-    public_methods = [(name, method) for name, method in methods
-                     if not name.startswith('_') or name == '__init__']
+        # Retrieve signature and type hints
+        sig = inspect.signature(init_method)
+        type_hints = get_type_hints(init_method)
 
-    for method_name, method in public_methods:
-        # Get the method's signature
-        sig = inspect.signature(method)
-        params = list(sig.parameters.values())
+        # Build the function name
+        func_name = f"initialize_{snake_case(cls.__name__)}"
 
-        # Remove 'self' parameter for instance methods
-        if params and params[0].name == 'self':
-            params = params[1:]
+        # Build function parameter list (minus 'self')
+        params_code = []
+        for name, param in sig.parameters.items():
+            if name == 'self':
+                continue
+            annotation = type_hints.get(name, Any)
 
-        # Create new signature without 'self'
-        sig.replace(parameters=params)
+            # Convert the annotation to string form for code generation
+            # (Simple approach: use annotation.__name__ if available,
+            # else "Any")
+            annotation_str = getattr(annotation, '__name__', 'Any')
 
-        # Get the method's docstring and properly format it
-        docstring = inspect.getdoc(method) or ""
-        formatted_docstring = f'"""{docstring}"""' if docstring else '""""""'
-
-        # Generate the new function name
-        if method_name == '__init__':
-            new_name = f"initialize_{cls.__name__.lower()}"
-        else:
-            new_name = f"{method_name}_{cls.__name__.lower()}"
-
-        # Create the new function
-        def create_function(method_name=method_name, params=params):
-            # Create function argument string
-            param_str = ', '.join(str(p) for p in params)
-
-            # Create the function body
-            if method_name == '__init__':
-                # For __init__, create and return an instance
-                func_body = f"""
-def {new_name}({param_str}):
-    {formatted_docstring}
-    instance = {cls.__name__}()
-    for key, value in locals().items():
-        if key != 'instance' and not key.startswith('__'):
-            setattr(instance, key, value)
-    return instance
-"""
+            if param.default is param.empty:
+                # No default
+                params_code.append(f"{name}: {annotation_str}")
             else:
-                # For other methods, create an instance and call the method
-                param_names = [p.name for p in params]
-                param_pass = ', '.join(param_names)
-                func_body = f"""
-def {new_name}({param_str}):
-    {formatted_docstring}
-    instance = {cls.__name__}()
-    return getattr(instance, '{method_name}')({param_pass})
+                # Provide the default
+                default_val = repr(param.default)
+                params_code.append(f"{name}: {annotation_str} = {default_val}")
+
+        # Combine parameter list into a string
+        params_str = ", ".join(params_code)
+
+        # Typically __init__ returns None, but let's see if we can find
+        #  a return type
+        return_annotation = type_hints.get('return', None)
+        if return_annotation is None:
+            return_annotation_str = " -> None"
+        else:
+            return_annotation_str = f" -> {
+                getattr(return_annotation, '__name__', 'Any')
+                }"
+
+        # Get docstring from __init__
+        docstring = init_method.__doc__ or ""
+
+        # CHANGED: build the call args safely (without set subtraction)
+        call_args_str = ", ".join(
+            name for name in sig.parameters if name != 'self'
+        )
+
+        # Construct the function body. This function instantiates the class.
+        func_code = f"""
+def {func_name}({params_str}){return_annotation_str}:
+    \"\"\"{docstring}\"\"\"
+    return {cls.__name__}({call_args_str})
+"""
+        # Compile and return the function object
+        scope: Dict[str, Any] = {
+            cls.__name__: cls,
+            "Any": Any
+        }
+        # Ensure all annotated types are in scope
+        for ann in type_hints.values():
+            if hasattr(ann, "__name__"):
+                scope[ann.__name__] = ann
+        exec(func_code, scope)
+        return scope[func_name]
+
+    def generate_method_func(
+            method_name: str, method_obj: Any
+            ) -> FunctionType:
+        """
+        Generate a standalone function for a public method. The new function
+        will be named `<methodname>_<classname_in_snake_case>` and it will
+        prepend a parameter referencing the instance of the class.
+        """
+
+        sig = inspect.signature(method_obj)
+        type_hints = get_type_hints(method_obj)
+        docstring = method_obj.__doc__ or ""
+
+        # The new function name: e.g. "start_browsermanager"
+        func_name = f"{method_name}_{snake_case(cls.__name__)}"
+
+        # Build function parameter list: rename `self` to e.g.
+        # `browser_manager: BrowserManager`
+        params_code = []
+        self_param_name = snake_case(cls.__name__)
+        params_code.append(f"{self_param_name}: {cls.__name__}")
+
+        for name, param in sig.parameters.items():
+            if name == 'self':
+                continue
+            annotation = type_hints.get(name, Any)
+            annotation_str = getattr(annotation, '__name__', 'Any')
+            if param.default is param.empty:
+                params_code.append(f"{name}: {annotation_str}")
+            else:
+                default_val = repr(param.default)
+                params_code.append(f"{name}: {annotation_str} = {default_val}")
+
+        params_str = ", ".join(params_code)
+
+        return_annotation = type_hints.get('return', None)
+        if return_annotation:
+            return_annotation_str = f" -> {getattr(return_annotation,
+                                                   '__name__', 'Any')}"
+        else:
+            return_annotation_str = ""
+
+        # CHANGED: safely gather call args
+        call_args_str = ", ".join(
+            name for name in sig.parameters if name != 'self'
+        )
+
+        # Generate function code
+        func_code = f"""
+def {func_name}({params_str}){return_annotation_str}:
+    \"\"\"{docstring}\"\"\"
+    return {self_param_name}.{method_name}({call_args_str})
 """
 
-            # Create function namespace with all necessary context
-            namespace = {
-                'cls': cls,
-                **class_dict,
-                **module_dict,
-                'Optional': Optional,
-                'List': List,
-                'Dict': Dict,
-                'Any': Any,
-                'Type': Type
-            }
+        # Compile the function object in a dynamic scope
+        scope: Dict[str, Any] = {
+            cls.__name__: cls,
+            "Any": Any
+        }
+        for ann in type_hints.values():
+            if hasattr(ann, "__name__"):
+                scope[ann.__name__] = ann
+        exec(func_code, scope)
+        return scope[func_name]
 
-            # Execute the function definition
-            exec(func_body.strip(), namespace)
+    # 1) Generate the initialize function for __init__
+    functions = {}
+    init_func = generate_initialize_func(cls)
+    functions[init_func.__name__] = init_func
 
-            # Return the created function
-            return namespace[new_name]
+    # 2) Generate functions for each *public* method
+    public_methods = [
+        (name, obj)
+        for name, obj in inspect.getmembers(cls, predicate=inspect.isfunction)
+        if not name.startswith("_")  # skip underscore methods
+    ]
 
-        # Store the created function
-        functions[new_name] = create_function()
+    for method_name, method_obj in public_methods:
+        new_func = generate_method_func(method_name, method_obj)
+        functions[new_func.__name__] = new_func
 
     return functions
-
-
-# Example usage:
-def convert_and_print_example(cls: Type) -> None:
-    """
-    Convert a class to functions and print their signatures and docstrings.
-
-    Args:
-        cls: The class to convert
-    """
-    functions = class_to_function(cls)
-
-    print(f"Generated functions from class {cls.__name__}:\n")
-    for name, func in sorted(functions.items()):
-        print(f"Function: {name}")
-        print(f"Signature: {inspect.signature(func)}")
-        if doc := inspect.getdoc(func):
-            print(f"Docstring:\n{doc}\n")
-        else:
-            print("No docstring\n")
