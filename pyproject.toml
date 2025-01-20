@@ -9,6 +9,10 @@ readme = "README.md"
 python = "^3.12"
 openai = "^1.59.8"
 requests = "^2.32.3"
+requests-mock = "^1.12.1"
+beautifulsoup4 = "^4.12.3"
+playwright = "^1.49.1"
+setuptools = "^75.8.0"
 
 
 [tool.poetry.group.dev.dependencies]

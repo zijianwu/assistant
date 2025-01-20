@@ -3,10 +3,10 @@ import requests
 
 def url_to_markdown(url: str) -> str:
     """Convert a URL to markdown content using Jina Reader service.
-    
+
     Args:
         url (str): The URL to convert to markdown
-        
+
     Returns:
         bytes: The markdown content as bytes data
     """
@@ -19,4 +19,4 @@ def url_to_markdown(url: str) -> str:
 
     response = requests.get(url, headers=headers)
 
-    print(response.text)
+    return response.text
