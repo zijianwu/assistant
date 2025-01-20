@@ -1,10 +1,10 @@
 from playwright.sync_api import sync_playwright
-import time
-import random
 import platform
+
 
 def get_chrome_version():
     return "121.0.0.0"
+
 
 def get_platform_specific_configs():
     os_name = platform.system()
@@ -30,9 +30,10 @@ def get_platform_specific_configs():
             "vendor": "Google Inc. (Intel)",
         }
 
+
 def main():
     platform_configs = get_platform_specific_configs()
-    
+
     playwright = sync_playwright().start()
     browser = playwright.chromium.launch(
         headless=False,
@@ -120,7 +121,6 @@ def main():
         };
     }""")
 
-
     # Navigate to website
     page.goto('https://example.com', wait_until='networkidle')
 
@@ -131,6 +131,7 @@ def main():
         context.close()
         browser.close()
         playwright.stop()
+
 
 if __name__ == "__main__":
     main()

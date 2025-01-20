@@ -45,7 +45,7 @@ def setup_HEB_search_location(page: BrowserPage, zip_code: int = 78209) -> None:
     return None
 
 
-def find_product_at_HEB(product_query: str, 
+def find_product_at_HEB(product_query: str,
                         browser_page: BrowserPage) -> List[str]:
     """
     Search for available products at HEB grocery store's website.
@@ -55,7 +55,7 @@ def find_product_at_HEB(product_query: str,
         browser_page (BrowserPage): Browser page object for web interaction
 
     Returns:
-        List[str]: List of product titles that are in stock. Empty list if no products 
+        List[str]: List of product titles that are in stock. Empty list if no products
                   found or in case of errors
 
     Raises:
@@ -83,7 +83,7 @@ def find_product_at_HEB(product_query: str,
             out_of_stock = card.locator(
                 'button[data-qe-id="addToCart"] span:has-text("Out of stock")'
             ).count() > 0
-            
+
             if not out_of_stock:
                 title = card.locator(
                     'div[data-qe-id="productTitle"] span'
@@ -91,7 +91,7 @@ def find_product_at_HEB(product_query: str,
                 results.append(title)
 
         return results
-    
+
     except Exception as e:
         print(f"Error searching for products: {e}")
         return []

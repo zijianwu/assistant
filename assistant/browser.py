@@ -4,36 +4,37 @@ from pathlib import Path
 from typing import Dict, Optional, bool
 import random
 
+
 class BrowserPage:
     """A wrapper around Playwright's Page object that maintains BrowserManager context."""
-    
+
     def __init__(self, playwright_page):
         """
         Initialize the managed page.
-        
+
         Args:
             playwright_page: The underlying Playwright page object
             browser_manager: The BrowserManager instance that created this page
         """
         self._page = playwright_page
-        
+
     def __getattr__(self, name):
         """Delegate any unknown attributes to the underlying Playwright page."""
         return getattr(self._page, name)
-    
+
     def __repr__(self):
-        return f"<BrowserPage wrapper of Playwright Page"
+        return "<BrowserPage wrapper of Playwright Page"
 
 
 class BrowserManager:
     """Manages a persistent Playwright browser instance with realistic user profile."""
-    
-    def __init__(self, 
+
+    def __init__(self,
                  user_data_dir: Optional[str] = None,
                  debug: bool = False):
         """
         Initialize the browser manager with a consistent user profile.
-        
+
         Args:
             user_data_dir: Directory to store persistent browser data. If None,
                          defaults to './browser_data'.
@@ -43,17 +44,17 @@ class BrowserManager:
         self.playwright = None
         self.browser_context = None
         self.debug = debug
-        
+
         # Developer persona configuration
         self.timezone = "America/New_York"
         self.base_latitude = 42.3601  # Boston
         self.base_longitude = -71.0589
         self.languages = ['en-US', 'en']
         self.developer_extensions = [
-            { "name": "React Developer Tools", "filename": "fmkadmapgofadopljbjfkapdkoienihi" },
-            { "name": "Redux DevTools", "filename": "lmhkpmbekcpmknklioeibfkpmmfibljd" },
-            { "name": "JSON Formatter", "filename": "bcjindcccaagfpapjjmafapmmgkkhgoa" },
-            { "name": "GitHub Dark Theme", "filename": "kom08lmcnfglkjfggdepcdcpbgkmegjj" }
+            {"name": "React Developer Tools", "filename": "fmkadmapgofadopljbjfkapdkoienihi"},
+            {"name": "Redux DevTools", "filename": "lmhkpmbekcpmknklioeibfkpmmfibljd"},
+            {"name": "JSON Formatter", "filename": "bcjindcccaagfpapjjmafapmmgkkhgoa"},
+            {"name": "GitHub Dark Theme", "filename": "kom08lmcnfglkjfggdepcdcpbgkmegjj"}
         ]
 
     def _get_chrome_version(self) -> str:
@@ -65,7 +66,7 @@ class BrowserManager:
     def _get_platform_specific_configs(self) -> Dict[str, str]:
         """Get platform-specific browser configurations for our developer persona."""
         chrome_version = self._get_chrome_version()
-        
+
         # Focused on MacOS configuration since our persona uses a MacBook Pro
         configs = {
             "Darwin": {
@@ -82,7 +83,7 @@ class BrowserManager:
                 "device_memory": 32,  # GB
             }
         }
-        
+
         # Fallback configurations for other platforms
         default_config = configs["Darwin"]
         return configs.get(platform.system(), default_config)
@@ -90,7 +91,7 @@ class BrowserManager:
     def _inject_browser_apis(self, page) -> None:
         """Inject realistic browser APIs and developer-specific configurations."""
         platform_configs = self._get_platform_specific_configs()
-        
+
         # Add developer-specific WebGL extensions
         webgl_extensions = [
             'ANGLE_instanced_arrays',
@@ -235,11 +236,11 @@ class BrowserManager:
 
         platform_configs = self._get_platform_specific_configs()
         self.playwright = sync_playwright().start()
-        
+
         # Calculate location with slight randomization for realism
         latitude = self.base_latitude + random.uniform(-0.01, 0.01)
         longitude = self.base_longitude + random.uniform(-0.01, 0.01)
-        
+
         # Launch with developer-focused configuration
         self.browser_context = self.playwright.chromium.launch_persistent_context(
             user_data_dir=str(self.user_data_dir),
@@ -273,7 +274,7 @@ class BrowserManager:
             locale="en-US",
             timezone_id=self.timezone,
             geolocation={"latitude": latitude, "longitude": longitude},
-            permissions=["geolocation", "notifications", "midi", "camera", "microphone", 
+            permissions=["geolocation", "notifications", "midi", "camera", "microphone",
                         "clipboard-read", "clipboard-write", "payment-handler",
                         "accelerometer", "ambient-light-sensor"],
             color_scheme='dark',  # Developers often prefer dark mode
@@ -302,7 +303,7 @@ class BrowserManager:
                 'sec-ch-ua-platform-version': '"13.0.0"'  # macOS version
             }
         )
-        
+
         # Set longer timeout for development workflows
         if self.debug:
             self.browser_context.set_default_timeout(36_000_000)
@@ -314,7 +315,7 @@ class BrowserManager:
 
     def stop(self) -> None:
         """Stops and cleans up browser automation resources.
-    
+
         Closes any active browser context and stops the Playwright instance.
         After calling this method, browser_context and playwright attributes
         will be set to None.
@@ -324,7 +325,7 @@ class BrowserManager:
             >>> browser.start()
             >>> # ... do browser automation ...
             >>> browser.stop()  # cleanup resources
-        
+
         Returns:
             None
         """
@@ -332,7 +333,7 @@ class BrowserManager:
             self.browser_context.close()
         if self.playwright:
             self.playwright.stop()
-            
+
         self.browser_context = None
         self.playwright = None
 
@@ -340,10 +341,8 @@ class BrowserManager:
         """Get a new page with injected browser APIs and developer tools."""
         if not self.browser_context:
             raise RuntimeError("Browser context not initialized. Call start() first.")
-        
+
         page = self.browser_context.new_page()
         self._inject_browser_apis(page)
         page = BrowserPage(page)
         return page
-
-

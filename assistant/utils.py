@@ -50,63 +50,62 @@ def function_to_schema(func) -> dict:
     }
 
 
-import inspect
 from typing import Any, Dict, List, Optional, Type
-import re
+
 
 def class_to_function(cls: Type) -> Dict[str, callable]:
     """
     Convert a class's __init__ and public methods into standalone functions.
-    
+
     Args:
         cls: The class to convert
-        
+
     Returns:
         Dict[str, callable]: A dictionary mapping function names to their callable implementations
     """
     functions = {}
-    
+
     # Get all class attributes including base classes
     class_dict = {}
     for c in inspect.getmro(cls):
         class_dict.update(c.__dict__)
-    
+
     # Get all imports from the class's module
     module = inspect.getmodule(cls)
     module_dict = {} if module is None else module.__dict__.copy()
-    
+
     # Get all public methods (excluding dunder methods)
     methods = inspect.getmembers(cls, predicate=inspect.isfunction)
-    public_methods = [(name, method) for name, method in methods 
+    public_methods = [(name, method) for name, method in methods
                      if not name.startswith('_') or name == '__init__']
-    
+
     for method_name, method in public_methods:
         # Get the method's signature
         sig = inspect.signature(method)
         params = list(sig.parameters.values())
-        
+
         # Remove 'self' parameter for instance methods
         if params and params[0].name == 'self':
             params = params[1:]
-            
+
         # Create new signature without 'self'
-        new_sig = sig.replace(parameters=params)
-        
+        sig.replace(parameters=params)
+
         # Get the method's docstring and properly format it
         docstring = inspect.getdoc(method) or ""
         formatted_docstring = f'"""{docstring}"""' if docstring else '""""""'
-        
+
         # Generate the new function name
         if method_name == '__init__':
             new_name = f"initialize_{cls.__name__.lower()}"
         else:
             new_name = f"{method_name}_{cls.__name__.lower()}"
-            
+
         # Create the new function
         def create_function(method_name=method_name, params=params):
             # Create function argument string
             param_str = ', '.join(str(p) for p in params)
-            
+
             # Create the function body
             if method_name == '__init__':
                 # For __init__, create and return an instance
@@ -129,7 +128,7 @@ def {new_name}({param_str}):
     instance = {cls.__name__}()
     return getattr(instance, '{method_name}')({param_pass})
 """
-            
+
             # Create function namespace with all necessary context
             namespace = {
                 'cls': cls,
@@ -141,28 +140,29 @@ def {new_name}({param_str}):
                 'Any': Any,
                 'Type': Type
             }
-            
+
             # Execute the function definition
             exec(func_body.strip(), namespace)
-            
+
             # Return the created function
             return namespace[new_name]
-            
+
         # Store the created function
         functions[new_name] = create_function()
-        
+
     return functions
+
 
 # Example usage:
 def convert_and_print_example(cls: Type) -> None:
     """
     Convert a class to functions and print their signatures and docstrings.
-    
+
     Args:
         cls: The class to convert
     """
     functions = class_to_function(cls)
-    
+
     print(f"Generated functions from class {cls.__name__}:\n")
     for name, func in sorted(functions.items()):
         print(f"Function: {name}")
