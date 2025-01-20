@@ -1,28 +1,27 @@
 from playwright.sync_api import sync_playwright
 import platform
 from pathlib import Path
-from typing import Dict, Optional, bool
+from typing import Dict, Optional
 import random
 
 
 class BrowserPage:
     """A wrapper around Playwright's Page object that maintains BrowserManager context."""
 
-    def __init__(self, playwright_page):
+    def __init__(self, playwright_page: object) -> None:
         """
         Initialize the managed page.
 
         Args:
             playwright_page: The underlying Playwright page object
-            browser_manager: The BrowserManager instance that created this page
         """
         self._page = playwright_page
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> object:
         """Delegate any unknown attributes to the underlying Playwright page."""
         return getattr(self._page, name)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "<BrowserPage wrapper of Playwright Page"
 
 
@@ -31,13 +30,14 @@ class BrowserManager:
 
     def __init__(self,
                  user_data_dir: Optional[str] = None,
-                 debug: bool = False):
+                 debug: bool = False) -> None:
         """
         Initialize the browser manager with a consistent user profile.
 
         Args:
             user_data_dir: Directory to store persistent browser data. If None,
                          defaults to './browser_data'.
+            debug: Flag to enable or disable debug mode.
         """
         self.user_data_dir = Path(user_data_dir or './browser_data')
         self.user_data_dir.mkdir(exist_ok=True)
@@ -88,7 +88,7 @@ class BrowserManager:
         default_config = configs["Darwin"]
         return configs.get(platform.system(), default_config)
 
-    def _inject_browser_apis(self, page) -> None:
+    def _inject_browser_apis(self, page: object) -> None:
         """Inject realistic browser APIs and developer-specific configurations."""
         platform_configs = self._get_platform_specific_configs()
 
@@ -337,7 +337,7 @@ class BrowserManager:
         self.browser_context = None
         self.playwright = None
 
-    def _new_page(self):
+    def _new_page(self) -> BrowserPage:
         """Get a new page with injected browser APIs and developer tools."""
         if not self.browser_context:
             raise RuntimeError("Browser context not initialized. Call start() first.")
