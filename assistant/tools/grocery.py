@@ -97,3 +97,4 @@ def find_product_at_HEB(product_query: str,
     except Exception as e:
         print(f"Error searching for products: {e}")
         return []
+

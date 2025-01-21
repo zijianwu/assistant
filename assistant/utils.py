@@ -2,9 +2,39 @@ import inspect
 import re
 from types import FunctionType
 from typing import Any, Dict, Type, get_type_hints
+import importlib
 
 
 def function_to_schema(func) -> dict:
+    """Converts a Python function to a JSON Schema compatible dictionary.
+
+    This function analyzes a Python function's signature and documentation to create a schema
+    that follows the OpenAI function calling format. It maps Python types to JSON Schema types
+    and captures required parameters.
+
+    Args:
+        func: The Python function to convert to a schema.
+
+    Returns:
+        dict: A dictionary containing the function schema with the following structure:
+            {
+                    "name": str,  # Function name
+                    "description": str,  # Function docstring
+                        "properties": dict,  # Parameter names and their types
+                        "required": list  # List of required parameter names
+
+    Raises:
+        ValueError: If unable to get the function signature
+        KeyError: If encountering an unknown type annotation
+
+    Example:
+        def greet(name: str, age: int = None):
+            '''Greets a person'''
+            pass
+
+        schema = function_to_schema(greet)
+        # Returns a schema with name and age parameters, where name is required
+    """
     type_map = {
         str: "string",
         int: "integer",
@@ -232,3 +262,29 @@ def {func_name}({params_str}){return_annotation_str}:
         functions[new_func.__name__] = new_func
 
     return functions
+
+
+def extract_functions_from_package(module_path):
+    """
+    Dynamically imports the given module_path and returns a list of
+    the functions defined in that module.
+
+    :param module_path: A string representing the path of the module/package,
+                        e.g. "assistant.tools.grocery"
+    :return: A list of function objects defined in the specified module.
+    """
+    # Import the module dynamically
+    module = importlib.import_module(module_path)
+
+    # Get all members of the module that are functions
+    all_functions = inspect.getmembers(module, inspect.isfunction)
+
+    # (Optional) Filter out functions not defined in this module
+    # i.e. skip any function whose __module__ is not module_path
+    # This avoids returning functions that might have been imported into the module.
+    filtered_functions = [
+        func for name, func in all_functions
+        if func.__module__ == module.__name__
+    ]
+
+    return filtered_functions
