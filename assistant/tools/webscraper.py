@@ -1,9 +1,10 @@
-import requests
-import os
+import asyncio
+from langchain_community.document_loaders import AsyncHtmlLoader
+from markdownify import markdownify as md
 
 
 def url_to_markdown(url: str) -> str:
-    """Convert a URL to markdown content using Jina Reader service.
+    """Convert a URL to markdown content using langchain's AsyncHtmlLoader and markdownify.
 
     Args:
         url (str): The URL to convert to markdown
@@ -11,16 +12,16 @@ def url_to_markdown(url: str) -> str:
     Returns:
         str: The markdown content as text data
     """
-    # TODO: Replace with langchain AsyncHtmlLoader
-    # and markdownify for better reliability
-    JINA_READER = 'https://r.jina.ai/'
-    url = JINA_READER + url
-    headers = {
-        'Authorization': os.environ.get('JINAAI_READER_API_KEY'),
-        'X-Retain-Images': 'none',
-        'X-With-Iframe': 'true',
-    }
-
-    response = requests.get(url, headers=headers)
-
-    return response.text
+    # TODO: Replace with Huggingface ReaderLMv2 locally for performance
+    # Load HTML content using AsyncHtmlLoader
+    loader = AsyncHtmlLoader([url])
+    html_docs = asyncio.run(loader.aload())
+    
+    if not html_docs:
+        return ""
+        
+    # Convert HTML to markdown using markdownify
+    html_content = html_docs[0].page_content
+    markdown_content = md(html_content)
+    
+    return markdown_content

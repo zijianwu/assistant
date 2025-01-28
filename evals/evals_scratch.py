@@ -1,3 +1,4 @@
+
 from openai import OpenAI
 import os
 import json
@@ -14,17 +15,10 @@ determine if any of them cannot be made due to lack of ingredients available
 at the grocery store, and create a shopping list aggregating all the
 ingredients needed for the recipes that can be made, including quantities.
 
-You will have access to an LLM agent that is responsible for executing the 
-plan that you create and will return results.
+You will have access to an LLM agent that is responsible for executing the plan that you create and will return results.
 
 The LLM agent has access to the following functions:
 {functions}
-
-Function calls that return text will be passed as messages. Function calls
-that return data will be automatically be stored in a `variables`, a
-dictionary with keys as in the format `function_name_result_n` where `n` 
-is the number of times the function has been called. Values will be the
-output of the function.
 
 When creating a plan for the LLM to execute, break your instructions into a logical, step-by-step order, using the specified format:
     - **Main actions are numbered** (e.g., 1, 2, 3).
@@ -43,23 +37,16 @@ Please find the list of recipe links below.
 EXECUTOR_PROMPT = """
 You are a helpful assistant responsible for executing the plan on household 
 management. Your task is to follow the plan exactly as it is written 
-and perform the necessary actions using the `variable` object available
-and tools available to you and asked of you.
+and perform the necessary actions using the tools available to you and asked of you.
 
 You must explain your decision-making process across various steps.
-
-You have access to an object called `variables`, which is a dictionary
-that stores the output of functions called during the plan execution.
-The keys are in the format `<function_name>_result_<n>` where `n` 
-is the number of times the function has been called and <function_name> 
-is the name of the function called. Values will be the output of the function.
 
 # Steps
 
 1. **Read and Understand plan**: Carefully read and fully understand the given plan on household management.
-2. **Identify the exact step in the plan**: Determine which part in the plan you are at, explicitly state which part of the plan you are on, and execute the instructions according to the plan. Only work on one step/substep of the plan at one time.
+2. **Identify the exact step in the plan**: Determine which part in the plan you are at, explicitly state which step of the plan you are on, and execute the instructions according to the policy. 
 3. **Decision Making**: Briefly explain your actions and why you are performing them.
-4. **Action Execution**: Perform the actions required (e.g., call any relevant functions/tool and input parameters, follow instructions if no function/tool call necessary)
+4. **Action Execution**: Perform the actions required (e.g., call any relevant functions/tool and input parameters, follow instructions if no function/tool call necessary). Only execute one step.
 
 PLAN:
 {plan}
@@ -77,7 +64,6 @@ def call_executor(system_prompt, plan, tools_schema, func_map, message_list, exe
     messages = [
         {'role': 'system', 'content': executor_plan_prompt},
     ]
-    variables = {}  # Dictionary to store non-JSON serializable variables
 
     while True:
         response = client.chat.completions.create(
@@ -103,7 +89,6 @@ def call_executor(system_prompt, plan, tools_schema, func_map, message_list, exe
             tool_id = tool.id
             function_name = tool.function.name
             input_arguments_str = tool.function.arguments
-            print("############################################TOOL CALL:", function_name, input_arguments_str)
 
             append_message({'type': 'tool_call', 'function_name': function_name, 'arguments': input_arguments_str}, message_list)
 
@@ -123,10 +108,7 @@ def call_executor(system_prompt, plan, tools_schema, func_map, message_list, exe
             try:
                 serialized_output = json.dumps(function_response)
             except (TypeError, ValueError):
-                # Store non-JSON serializable response in variables dictionary
-                var_name = f"{function_name}_result_{len([k for k in variables if k.startswith(function_name)])}"
-                variables[var_name] = function_response
-                serialized_output = f"Available variables: {str(variables)}"
+                serialized_output = str(function_response)
 
             messages.append({
                 "role": "tool",
@@ -136,7 +118,7 @@ def call_executor(system_prompt, plan, tools_schema, func_map, message_list, exe
 
             append_message({'type': 'tool_response', 'function_name': function_name, 'response': serialized_output}, message_list)
 
-    return messages, variables
+    return messages
 
 
 client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
@@ -155,7 +137,7 @@ plan = call_planner(
 append_message({'type': 'plan', 'content': plan}, message_list)
 append_message(
     {'type': 'status', 'message': 'Executing plan...'}, message_list)
-messages, variables = call_executor(
+messages = call_executor(
     system_prompt=EXECUTOR_PROMPT,
     plan=plan,
     tools_schema=tools_schema,
@@ -163,12 +145,3 @@ messages, variables = call_executor(
     message_list=message_list)
 append_message(
     {'type': 'status', 'message': 'Processing complete.'}, message_list)
-
-a_list = []
-step = """
-1. Call the `url_to_markdown` function with the recipe URL as the `url` argument to retrieve the recipe content in markdown format.
-2. Extract the list of ingredients and their quantities from the markdown content.
-3. Call the `instructions_complete` function to indicate that all instructions have been successfully executed and the process is complete.
-The recipe url is https://thewoksoflife.com/turnip-cake-lo-bak-go/
-"""
-messages, variables = call_executor(EXECUTOR_PROMPT, step, tools_schema, func_map, message_list=a_list)
